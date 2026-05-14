@@ -1,0 +1,65 @@
+[
+  {
+    "addr": "octAKgiQn3mzYU5LAXUHiD6JuiidiPaFv3ktKdMgwu4jRdm",
+    "file": "data/wallet_AKgiQn3m.oct",
+    "hd": true,
+    "hd_index": 0,
+    "hd_version": 2,
+    "name": "wallet",
+    "seed_hash": "6cd377fe1c7994a9"
+  },
+  {
+    "addr": "oct7X5oxurkkYGkNc2NdSdLuwFyhfLHRp3m4uqvxBX6Bh7y",
+    "file": "data/wallet_7X5oxurk.oct",
+    "hd": true,
+    "hd_index": 0,
+    "hd_version": 2,
+    "name": "imported",
+    "seed_hash": "ad4cb6e42d959dcb"
+  },
+  {
+    "addr": "oct2LPDq2Hmw94kkaMnzUy66ikszhxHVZgupvgRzQUw1zHW",
+    "file": "data/wallet_2LPDq2Hm.oct",
+    "hd": true,
+    "hd_index": 0,
+    "hd_version": 2,
+    "name": "imported",
+    "seed_hash": "56c84f99c4121668"
+  },
+  {
+    "addr": "octCaB9tZM2D5JMaJbMyVGQHBehiRYY2G955jPk1UWtCdcq",
+    "file": "data/wallet_CaB9tZM2.oct",
+    "hd": true,
+    "hd_index": 0,
+    "hd_version": 2,
+    "name": "imported",
+    "seed_hash": "30cdcdc816a43d46"
+  },
+  {
+    "addr": "oct6EPTZKKSJs6Wrx1BixiNrCsrXyR13MVXTrSS2hg2eUZk",
+    "file": "data/wallet_6EPTZKKS.oct",
+    "hd": true,
+    "hd_index": 0,
+    "hd_version": 2,
+    "name": "imported",
+    "seed_hash": "e660a5f4cad3cc17"
+  },
+  {
+    "addr": "octJCBAuAHoS11USgBaQNHEYYB1eEZzTfRh1bg7xAAq4qKK",
+    "file": "data/wallet_JCBAuAHo.oct",
+    "hd": true,
+    "hd_index": 0,
+    "hd_version": 2,
+    "name": "imported",
+    "seed_hash": "d2bb082dcc5154c1"
+  },
+  {
+    "addr": "oct2nhiM76h5wAVfMQLSEDC8rwgBFNPVHFXp7A4WkHoErVY",
+    "file": "data/wallet_2nhiM76h.oct",
+    "hd": true,
+    "hd_index": 0,
+    "hd_version": 2,
+    "name": "imported",
+    "seed_hash": "36f44e982a8790e5"
+  }
+]
