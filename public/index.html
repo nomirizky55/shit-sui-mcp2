@@ -355,7 +355,7 @@
           <div class="copy-row">
             <div class="code-box" id="mcpUrl">https://shit-sui-mcp-udhl.onrender.com/mcp</div>
           </div>
-          <div class="code-box" id="claudePrompt">Gunakan tool delegated_mint 1 kali untuk wallet Sui saya 0xwallet yang terhubung</div>
+          <div class="code-box" id="claudePrompt">Use the delegated_mint tool 1 time for my connected Sui wallet 0xconnectedwallet</div>
         </section>
 
         <section class="status-panel">
@@ -480,8 +480,8 @@
 
       function updateClaudePrompt() {
         const count = Number(mintCount.value || 1);
-        const address = account?.address ?? "0xwallet yang terhubung";
-        claudePrompt.textContent = `Gunakan tool delegated_mint ${count} kali untuk wallet Sui saya ${address}`;
+        const address = account?.address ?? "0xconnectedwallet";
+        claudePrompt.textContent = `Use the delegated_mint tool ${count} ${count === 1 ? "time" : "times"} for my Sui wallet ${address}`;
       }
 
       async function refreshStatus() {

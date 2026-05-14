@@ -145,7 +145,7 @@ https://curvy-duck-31.loca.lt/mcp
 Set `MCP_OAUTH_BEARER_TOKEN` in the Codex environment before using the plugin. Then a user can ask:
 
 ```text
-Mint SHIT untuk wallet Sui saya 0x...
+Use the delegated_mint tool 1 time for my Sui wallet 0x...
 ```
 
 Codex should check eligibility, prepare a sponsored mint, ask the user to sign with their Sui wallet, submit the signature, and report the transaction digest.

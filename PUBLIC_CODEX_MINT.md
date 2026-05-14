@@ -39,13 +39,13 @@ Do not publish the access token in public posts. Give it only to users or tester
 Users should be able to say:
 
 ```text
-mint 1 SHIT untuk wallet Sui saya 0x...
+Use the delegated_mint tool 1 time for my Sui wallet 0x...
 ```
 
 or:
 
 ```text
-mint 10 SHIT untuk wallet Sui saya 0x...
+Use the delegated_mint tool 10 times for my Sui wallet 0x...
 ```
 
 Codex should then:
@@ -65,13 +65,13 @@ Codex should then:
 2. Send:
 
 ```text
-mint 1 SHIT untuk wallet Sui saya 0xYOUR_SUI_ADDRESS
+Use the delegated_mint tool 1 time for my Sui wallet 0xYOUR_SUI_ADDRESS
 ```
 
 or:
 
 ```text
-mint 10 SHIT untuk wallet Sui saya 0xYOUR_SUI_ADDRESS
+Use the delegated_mint tool 10 times for my Sui wallet 0xYOUR_SUI_ADDRESS
 ```
 
 3. Codex checks whether the wallet can mint.
