@@ -14,6 +14,7 @@ export const SHIT_MAX_MINTS_PER_WALLET = 10;
 export type MintStatus = {
   network: AppConfig["SUI_NETWORK"];
   packageId: string;
+  runtimePackageId: string;
   mintConfigId: string | null;
   feeRecipient: string;
   lpRecipient: string;
@@ -43,6 +44,8 @@ export type UserMintStatus = {
   publicMintRemaining: string | null;
   publicMintRemainingTokens: string | null;
   frozen: boolean | null;
+  delegatedRelayer: string | null;
+  delegatedRemainingMints: number | null;
 };
 
 export function createSuiClient(config: AppConfig): SuiClient {
@@ -55,6 +58,7 @@ export function getMintStatus(config: AppConfig): MintStatus {
   return {
     network: config.SUI_NETWORK,
     packageId: config.SUI_PACKAGE_ID,
+    runtimePackageId: getRuntimePackageId(config),
     mintConfigId: config.SHIT_MINT_CONFIG_ID ?? null,
     feeRecipient: config.FEE_RECIPIENT,
     lpRecipient: config.LP_RECIPIENT,
@@ -71,7 +75,7 @@ export function getMintStatus(config: AppConfig): MintStatus {
 
 export async function assertPackageObjectsExist(client: SuiClient, config: AppConfig): Promise<void> {
   const mintConfigId = requireMintConfigId(config);
-  const ids = [config.SUI_PACKAGE_ID, mintConfigId];
+  const ids = Array.from(new Set([config.SUI_PACKAGE_ID, getRuntimePackageId(config), mintConfigId]));
   const objects = await client.multiGetObjects({
     ids,
     options: { showType: true }
@@ -89,14 +93,16 @@ export async function assertPackageObjectsExist(client: SuiClient, config: AppCo
 export async function getUserMintStatus(
   client: SuiClient,
   config: AppConfig,
-  userAddress: string
+  userAddress: string,
+  delegatedRelayer?: string
 ): Promise<UserMintStatus> {
   const mintConfigId = requireMintConfigId(config);
   const coinType = getShitCoinType(config);
-  const [balance, mintCount, configState] = await Promise.all([
+  const [balance, mintCount, configState, delegatedRemainingMints] = await Promise.all([
     client.getBalance({ owner: userAddress, coinType }),
     getUserMintCount(client, mintConfigId, userAddress),
-    getMintConfigState(client, mintConfigId)
+    getMintConfigState(client, mintConfigId),
+    delegatedRelayer ? getDelegatedMintCount(client, config, userAddress, delegatedRelayer) : Promise.resolve(null)
   ]);
 
   const remainingMints = Math.max(SHIT_MAX_MINTS_PER_WALLET - mintCount, 0);
@@ -125,7 +131,9 @@ export async function getUserMintStatus(
     publicMintedTokens: configState.publicMinted === null ? null : formatTokenAmount(configState.publicMinted),
     publicMintRemaining,
     publicMintRemainingTokens: publicMintRemainingRaw === null ? null : formatTokenAmount(publicMintRemainingRaw),
-    frozen: configState.frozen
+    frozen: configState.frozen,
+    delegatedRelayer: delegatedRelayer ?? null,
+    delegatedRemainingMints
   };
 }
 
@@ -147,6 +155,31 @@ async function getUserMintCount(client: SuiClient, mintConfigId: string, userAdd
     name: {
       type: "address",
       value: userAddress
+    }
+  });
+
+  if (dynamicField.error || !dynamicField.data?.content || dynamicField.data.content.dataType !== "moveObject") {
+    return 0;
+  }
+
+  return Number(extractMoveField(dynamicField.data.content.fields, "value") ?? 0);
+}
+
+async function getDelegatedMintCount(
+  client: SuiClient,
+  config: AppConfig,
+  owner: string,
+  relayer: string
+): Promise<number> {
+  const mintConfigId = requireMintConfigId(config);
+  const dynamicField = await client.getDynamicFieldObject({
+    parentId: mintConfigId,
+    name: {
+      type: `${getRuntimePackageId(config)}::shit_coin::DelegationKey`,
+      value: {
+        owner,
+        relayer
+      }
     }
   });
 
@@ -268,6 +301,87 @@ export async function submitSponsoredMintTransaction(
   });
 }
 
+export async function prepareApproveRelayerTransaction(
+  client: SuiClient,
+  config: AppConfig,
+  owner: string,
+  relayer: string,
+  maxMints: number,
+  sponsor?: string
+): Promise<string> {
+  const tx = new Transaction();
+  tx.setSender(owner);
+  if (sponsor) {
+    tx.setGasOwner(sponsor);
+    tx.setGasBudget(50_000_000n);
+  }
+
+  tx.moveCall({
+    target: `${getRuntimePackageId(config)}::shit_coin::approve_relayer`,
+    arguments: [
+      tx.object(requireMintConfigId(config)),
+      tx.pure.address(relayer),
+      tx.pure.u64(BigInt(maxMints))
+    ]
+  });
+
+  const bytes = await tx.build({ client });
+  return toBase64(bytes);
+}
+
+export async function submitSponsoredApproveRelayerTransaction(
+  client: SuiClient,
+  sponsorKeypair: Keypair,
+  transactionBlock: string,
+  userSignature: string
+) {
+  const bytes = fromBase64(transactionBlock);
+  const sponsorSignature = (await sponsorKeypair.signTransaction(bytes)).signature;
+
+  return client.executeTransactionBlock({
+    transactionBlock,
+    signature: [userSignature, sponsorSignature],
+    requestType: "WaitForLocalExecution",
+    options: {
+      showEffects: true,
+      showObjectChanges: true
+    }
+  });
+}
+
+export async function executeDelegatedMintTransaction(
+  client: SuiClient,
+  config: AppConfig,
+  relayerKeypair: Keypair,
+  recipient: string
+) {
+  const tx = new Transaction();
+  tx.setSender(relayerKeypair.toSuiAddress());
+  tx.setGasBudget(50_000_000n);
+
+  const [feeCoin] = tx.splitCoins(tx.gas, [tx.pure.u64(config.MINT_FEE_MIST)]);
+  tx.moveCall({
+    target: `${getRuntimePackageId(config)}::shit_coin::delegated_mint`,
+    arguments: [
+      tx.object(requireMintConfigId(config)),
+      feeCoin,
+      tx.pure.address(recipient),
+      tx.pure.u64(SHIT_MINT_AMOUNT)
+    ]
+  });
+
+  return client.signAndExecuteTransaction({
+    signer: relayerKeypair,
+    transaction: tx,
+    requestType: "WaitForLocalExecution",
+    options: {
+      showBalanceChanges: true,
+      showEffects: true,
+      showObjectChanges: true
+    }
+  });
+}
+
 function buildMintTransaction(config: AppConfig, recipient: string): Transaction {
   const tx = new Transaction();
   tx.setSender(recipient);
@@ -276,7 +390,7 @@ function buildMintTransaction(config: AppConfig, recipient: string): Transaction
   const [feeCoin] = tx.splitCoins(tx.gas, [tx.pure.u64(config.MINT_FEE_MIST)]);
 
   tx.moveCall({
-    target: `${config.SUI_PACKAGE_ID}::shit_coin::mint`,
+    target: `${getRuntimePackageId(config)}::shit_coin::mint`,
     arguments: [
       tx.object(mintConfigId),
       feeCoin,
@@ -302,7 +416,7 @@ export async function prepareConfigTransaction(
   tx.setSender(sender);
 
   tx.moveCall({
-    target: `${config.SUI_PACKAGE_ID}::shit_coin::create_config`,
+    target: `${getRuntimePackageId(config)}::shit_coin::create_config`,
     arguments: [
       tx.object(adminCapId),
       tx.object(treasuryCapId),
@@ -314,4 +428,8 @@ export async function prepareConfigTransaction(
 
   const bytes = await tx.build({ client });
   return toBase64(bytes);
+}
+
+function getRuntimePackageId(config: AppConfig): string {
+  return config.SUI_RUNTIME_PACKAGE_ID ?? config.SUI_PACKAGE_ID;
 }

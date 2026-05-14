@@ -22,6 +22,8 @@ services:
         sync: false
       - key: SUI_PACKAGE_ID
         value: 0x8e8d346494e270479b183ae7c6f0f8fa8334dd0b3e6d4622af7b33d1c869b1ed
+      - key: SUI_RUNTIME_PACKAGE_ID
+        value: 0x59d7a2e62b7050719434aa25602e6938ab0ce24d580b55d2e7df672b1ebf2662
       - key: SHIT_MINT_CONFIG_ID
         value: 0x1167d03e5d967b8ca8c561e18021434b5acc6a7dc559609b83ca2459ed5a9836
       - key: MINT_FEE_MIST

@@ -315,6 +315,7 @@
           <div class="hero-actions">
             <button id="copyMcpButton" class="secondary">Copy MCP URL</button>
             <button id="copyPromptButton" class="secondary">Copy Claude Prompt</button>
+            <button id="approveRelayerButton" disabled>Approve Claude Once</button>
           </div>
         </section>
 
@@ -371,11 +372,13 @@
             <div class="stat"><span>Used</span><strong id="used">-</strong></div>
             <div class="stat"><span>Remaining</span><strong id="remaining">-</strong></div>
             <div class="stat"><span>Eligible</span><strong id="eligible">-</strong></div>
+            <div class="stat"><span>Claude Allowance</span><strong id="delegated">-</strong></div>
           </div>
         </section>
 
         <section class="result-panel">
           <strong>Transactions</strong>
+          <button id="delegatedMintButton" class="secondary" disabled>Claude Mint Without Wallet Popup</button>
           <div id="results" class="muted">No mint submitted yet.</div>
         </section>
       </main>
@@ -391,6 +394,8 @@
       const connectButton = document.querySelector("#connectButton");
       const copyMcpButton = document.querySelector("#copyMcpButton");
       const copyPromptButton = document.querySelector("#copyPromptButton");
+      const approveRelayerButton = document.querySelector("#approveRelayerButton");
+      const delegatedMintButton = document.querySelector("#delegatedMintButton");
       const mintButton = document.querySelector("#mintButton");
       const mintCount = document.querySelector("#mintCount");
       const walletAddress = document.querySelector("#walletAddress");
@@ -402,7 +407,8 @@
         balance: document.querySelector("#balance"),
         used: document.querySelector("#used"),
         remaining: document.querySelector("#remaining"),
-        eligible: document.querySelector("#eligible")
+        eligible: document.querySelector("#eligible"),
+        delegated: document.querySelector("#delegated")
       };
 
       let wallets = [];
@@ -415,6 +421,8 @@
       connectButton.addEventListener("click", connectWallet);
       copyMcpButton.addEventListener("click", () => copyText(MCP_URL, "MCP URL copied"));
       copyPromptButton.addEventListener("click", () => copyText(claudePrompt.textContent, "Claude prompt copied"));
+      approveRelayerButton.addEventListener("click", approveRelayer);
+      delegatedMintButton.addEventListener("click", delegatedMint);
       mintButton.addEventListener("click", mint);
 
       function refreshWallets() {
@@ -450,6 +458,7 @@
         walletAddress.textContent = account.address;
         claudePrompt.textContent = `mint 1 SHIT untuk wallet Sui saya ${account.address}`;
         mintButton.disabled = false;
+        approveRelayerButton.disabled = false;
         await refreshStatus();
       }
 
@@ -459,7 +468,75 @@
         fields.used.textContent = `${status.mintCount}/10`;
         fields.remaining.textContent = String(status.remainingMints);
         fields.eligible.textContent = status.canMint ? "Yes" : "No";
+        fields.delegated.textContent = status.delegatedRemainingMints === null ? "-" : String(status.delegatedRemainingMints);
+        delegatedMintButton.disabled = !status.canMint || (status.delegatedRemainingMints ?? 0) <= 0;
         setNotice(status.canMint ? "Ready to mint" : status.mintBlockedReason ?? "Wallet cannot mint");
+      }
+
+      async function approveRelayer() {
+        if (!account || !wallet) return;
+
+        approveRelayerButton.disabled = true;
+        try {
+          const maxMints = Number(mintCount.value);
+          setNotice("Preparing one-time Claude approval");
+          const prepared = await requestJson("/api/prepare-relayer-approval", {
+            method: "POST",
+            body: JSON.stringify({ userAddress: account.address, maxMints })
+          });
+
+          setNotice("Sign one-time Claude approval in your wallet");
+          const userSignature = await signTransaction(prepared.transactionBlock);
+
+          setNotice("Submitting Claude approval");
+          const submitted = await requestJson("/api/submit-relayer-approval", {
+            method: "POST",
+            body: JSON.stringify({
+              userAddress: account.address,
+              maxMints,
+              transactionBlock: prepared.transactionBlock,
+              userSignature
+            })
+          });
+
+          appendDigest(submitted.digest);
+          await refreshStatus();
+          setNotice("Claude approval active");
+        } catch (error) {
+          showError(error);
+        } finally {
+          approveRelayerButton.disabled = false;
+        }
+      }
+
+      async function delegatedMint() {
+        if (!account) return;
+
+        delegatedMintButton.disabled = true;
+        try {
+          await refreshStatus();
+          const requested = Number(mintCount.value);
+          const count = Math.min(requested, status.remainingMints, status.delegatedRemainingMints ?? 0);
+          if (count <= 0) {
+            throw new Error("Approve Claude once before delegated minting.");
+          }
+
+          for (let index = 0; index < count; index += 1) {
+            setNotice(`Claude mint ${index + 1} of ${count}`);
+            const submitted = await requestJson("/api/delegated-mint", {
+              method: "POST",
+              body: JSON.stringify({ userAddress: account.address })
+            });
+            appendDigest(submitted.digest);
+            await refreshStatus();
+          }
+
+          setNotice("Claude mint complete");
+        } catch (error) {
+          showError(error);
+        } finally {
+          await refreshStatus();
+        }
       }
 
       async function mint() {

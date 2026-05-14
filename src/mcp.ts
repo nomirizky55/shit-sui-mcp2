@@ -8,9 +8,12 @@ import {
   createSuiClient,
   getMintStatus,
   getUserMintStatus,
+  executeDelegatedMintTransaction,
+  prepareApproveRelayerTransaction,
   prepareConfigTransaction,
   prepareMintTransaction,
   prepareSponsoredMintTransaction,
+  submitSponsoredApproveRelayerTransaction,
   submitSponsoredMintTransaction
 } from "./sui.js";
 
@@ -105,7 +108,8 @@ export function createShitMinterMcpServer(config: AppConfig): McpServer {
       assertAuthorized(config, accessToken);
       await assertPackageObjectsExist(client, config);
 
-      const status = await getUserMintStatus(client, config, userAddress);
+      const sponsor = config.SPONSOR_PRIVATE_KEY || config.SPONSOR_KEYSTORE_PATH ? loadSponsorKeypair(config).toSuiAddress() : undefined;
+      const status = await getUserMintStatus(client, config, userAddress, sponsor);
       return textJson({
         ok: true,
         ...status
@@ -195,6 +199,100 @@ export function createShitMinterMcpServer(config: AppConfig): McpServer {
         sponsor: sponsor.toSuiAddress(),
         balanceChanges: result.balanceChanges,
         objectChanges: result.objectChanges
+      });
+    }
+  );
+
+  server.tool(
+    "prepare_relayer_approval",
+    "Prepare a one-time Sui transaction where the user approves the configured relayer to mint SHIT to their wallet without approving every future mint.",
+    {
+      ...authShape,
+      userAddress: z.string().regex(/^0x[a-fA-F0-9]+$/).describe("Sui address that approves delegated minting."),
+      maxMints: z.number().int().min(1).max(10).default(10)
+    },
+    async ({ accessToken, userAddress, maxMints }) => {
+      assertAuthorized(config, accessToken);
+      await assertPackageObjectsExist(client, config);
+
+      const sponsor = loadSponsorKeypair(config).toSuiAddress();
+      const transactionBlock = await prepareApproveRelayerTransaction(client, config, userAddress, sponsor, maxMints, sponsor);
+      return textJson({
+        kind: "sponsored_relayer_approval_transaction_block",
+        network: config.SUI_NETWORK,
+        signer: userAddress,
+        relayer: sponsor,
+        maxMints,
+        transactionBlock,
+        nextStep: "Have the user wallet sign this once, then call submit_relayer_approval with userSignature."
+      });
+    }
+  );
+
+  server.tool(
+    "submit_relayer_approval",
+    "Submit a signed one-time relayer approval transaction.",
+    {
+      ...authShape,
+      userAddress: z.string().regex(/^0x[a-fA-F0-9]+$/).describe("Sui address that signed the approval."),
+      maxMints: z.number().int().min(1).max(10).default(10),
+      transactionBlock: z.string().min(1),
+      userSignature: z.string().min(1)
+    },
+    async ({ accessToken, userAddress, maxMints, transactionBlock, userSignature }) => {
+      assertAuthorized(config, accessToken);
+
+      const sponsor = loadSponsorKeypair(config);
+      const expectedTransactionBlock = await prepareApproveRelayerTransaction(client, config, userAddress, sponsor.toSuiAddress(), maxMints, sponsor.toSuiAddress());
+      if (transactionBlock !== expectedTransactionBlock) {
+        throw new Error("Approval transaction block does not match the expected delegated mint approval. Prepare a fresh approval.");
+      }
+
+      const result = await submitSponsoredApproveRelayerTransaction(client, sponsor, transactionBlock, userSignature);
+      return textJson({
+        digest: result.digest,
+        status: result.effects?.status,
+        relayer: sponsor.toSuiAddress()
+      });
+    }
+  );
+
+  server.tool(
+    "delegated_mint",
+    "Mint SHIT to a wallet using its prior relayer approval. The user does not need to approve this mint if delegatedRemainingMints is greater than zero.",
+    {
+      ...authShape,
+      userAddress: z.string().regex(/^0x[a-fA-F0-9]+$/).describe("Sui address receiving delegated mint."),
+      count: z.number().int().min(1).max(10).default(1)
+    },
+    async ({ accessToken, userAddress, count }) => {
+      assertAuthorized(config, accessToken);
+      await assertPackageObjectsExist(client, config);
+
+      const sponsor = loadSponsorKeypair(config);
+      const before = await getUserMintStatus(client, config, userAddress, sponsor.toSuiAddress());
+      if ((before.delegatedRemainingMints ?? 0) <= 0) {
+        throw new Error("Wallet has not approved this relayer yet, or delegated mint allowance is exhausted.");
+      }
+
+      const mintCount = Math.min(count, before.remainingMints, before.delegatedRemainingMints ?? 0);
+      const digests = [];
+      for (let index = 0; index < mintCount; index += 1) {
+        const result = await executeDelegatedMintTransaction(client, config, sponsor, userAddress);
+        digests.push({
+          digest: result.digest,
+          status: result.effects?.status
+        });
+      }
+
+      const after = await getUserMintStatus(client, config, userAddress, sponsor.toSuiAddress());
+      return textJson({
+        ok: true,
+        requested: count,
+        minted: mintCount,
+        relayer: sponsor.toSuiAddress(),
+        digests,
+        status: after
       });
     }
   );

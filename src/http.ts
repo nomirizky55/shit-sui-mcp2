@@ -9,7 +9,10 @@ import {
   assertPackageObjectsExist,
   createSuiClient,
   getUserMintStatus,
+  executeDelegatedMintTransaction,
+  prepareApproveRelayerTransaction,
   prepareSponsoredMintTransaction,
+  submitSponsoredApproveRelayerTransaction,
   submitSponsoredMintTransaction
 } from "./sui.js";
 
@@ -56,7 +59,84 @@ app.get("/api/mint-status", async (req: HttpRequest & { query?: Record<string, u
     const userAddress = String(req.query?.address ?? "");
     assertSuiAddress(userAddress);
     await assertPackageObjectsExist(client, config);
-    res.json({ ok: true, ...(await getUserMintStatus(client, config, userAddress)) });
+    const relayer = getRelayerAddress();
+    res.json({ ok: true, ...(await getUserMintStatus(client, config, userAddress, relayer)) });
+  } catch (error) {
+    sendJsonError(res, error);
+  }
+});
+
+app.get("/api/relayer", (_req: HttpRequest, res: HttpResponse) => {
+  try {
+    res.json({ ok: true, relayer: getRelayerAddress() });
+  } catch (error) {
+    sendJsonError(res, error);
+  }
+});
+
+app.post("/api/prepare-relayer-approval", async (req: HttpRequest, res: HttpResponse) => {
+  try {
+    const userAddress = getBodyString(req.body, "userAddress");
+    const maxMints = getBodyNumber(req.body, "maxMints");
+    assertSuiAddress(userAddress);
+    assertMintCount(maxMints);
+
+    const relayer = getRelayerAddress();
+    const transactionBlock = await prepareApproveRelayerTransaction(client, config, userAddress, relayer, maxMints, relayer);
+    res.json({
+      ok: true,
+      network: config.SUI_NETWORK,
+      signer: userAddress,
+      relayer,
+      maxMints,
+      transactionBlock
+    });
+  } catch (error) {
+    sendJsonError(res, error);
+  }
+});
+
+app.post("/api/submit-relayer-approval", async (req: HttpRequest, res: HttpResponse) => {
+  try {
+    const userAddress = getBodyString(req.body, "userAddress");
+    const transactionBlock = getBodyString(req.body, "transactionBlock");
+    const userSignature = getBodyString(req.body, "userSignature");
+    const maxMints = getBodyNumber(req.body, "maxMints");
+    assertSuiAddress(userAddress);
+    assertMintCount(maxMints);
+
+    const sponsor = loadSponsorKeypair(config);
+    const expectedTransactionBlock = await prepareApproveRelayerTransaction(client, config, userAddress, sponsor.toSuiAddress(), maxMints, sponsor.toSuiAddress());
+    if (transactionBlock !== expectedTransactionBlock) {
+      throw new Error("Approval transaction block does not match the expected relayer approval. Prepare a fresh transaction.");
+    }
+
+    const result = await submitSponsoredApproveRelayerTransaction(client, sponsor, transactionBlock, userSignature);
+    res.json({
+      ok: true,
+      digest: result.digest,
+      status: result.effects?.status,
+      relayer: sponsor.toSuiAddress()
+    });
+  } catch (error) {
+    sendJsonError(res, error);
+  }
+});
+
+app.post("/api/delegated-mint", async (req: HttpRequest, res: HttpResponse) => {
+  try {
+    const userAddress = getBodyString(req.body, "userAddress");
+    assertSuiAddress(userAddress);
+
+    const sponsor = loadSponsorKeypair(config);
+    const result = await executeDelegatedMintTransaction(client, config, sponsor, userAddress);
+    res.json({
+      ok: true,
+      digest: result.digest,
+      status: result.effects?.status,
+      balanceChanges: result.balanceChanges,
+      objectChanges: result.objectChanges
+    });
   } catch (error) {
     sendJsonError(res, error);
   }
@@ -196,10 +276,34 @@ function getBodyString(body: unknown, key: string): string {
   return value;
 }
 
+function getBodyNumber(body: unknown, key: string): number {
+  if (!body || typeof body !== "object") {
+    throw new Error("Expected JSON request body.");
+  }
+
+  const value = (body as Record<string, unknown>)[key];
+  const numberValue = typeof value === "number" ? value : Number(value);
+  if (!Number.isInteger(numberValue)) {
+    throw new Error(`Missing required numeric field: ${key}`);
+  }
+
+  return numberValue;
+}
+
 function assertSuiAddress(address: string): void {
   if (!/^0x[a-fA-F0-9]+$/.test(address)) {
     throw new Error("Invalid Sui address.");
   }
+}
+
+function assertMintCount(count: number): void {
+  if (!Number.isInteger(count) || count < 1 || count > 10) {
+    throw new Error("Mint count must be between 1 and 10.");
+  }
+}
+
+function getRelayerAddress(): string {
+  return loadSponsorKeypair(config).toSuiAddress();
 }
 
 function sendJsonError(res: HttpResponse, error: unknown): void {
