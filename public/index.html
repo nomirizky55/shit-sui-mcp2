@@ -355,7 +355,7 @@
           <div class="copy-row">
             <div class="code-box" id="mcpUrl">https://shit-sui-mcp-udhl.onrender.com/mcp</div>
           </div>
-          <div class="code-box" id="claudePrompt">mint 1 SHIT untuk wallet Sui saya 0x...</div>
+          <div class="code-box" id="claudePrompt">Gunakan tool delegated_mint 1 kali untuk wallet Sui saya 0xwallet yang terhubung</div>
         </section>
 
         <section class="status-panel">
@@ -450,7 +450,7 @@
         }
 
         walletAddress.textContent = account.address;
-        claudePrompt.textContent = `mint 1 SHIT untuk wallet Sui saya ${account.address}`;
+        claudePrompt.textContent = `Gunakan tool delegated_mint 1 kali untuk wallet Sui saya ${account.address}`;
         approveRelayerButton.disabled = false;
         connectButton.textContent = "Disconnect";
         await refreshStatus();
@@ -465,7 +465,7 @@
         account = null;
         status = null;
         walletAddress.textContent = "Not connected";
-        claudePrompt.textContent = "mint 1 SHIT untuk wallet Sui saya 0x...";
+        claudePrompt.textContent = "Gunakan tool delegated_mint 1 kali untuk wallet Sui saya 0xwallet yang terhubung";
         approveRelayerButton.disabled = true;
         delegatedMintButton.disabled = true;
         connectButton.textContent = "Connect";
