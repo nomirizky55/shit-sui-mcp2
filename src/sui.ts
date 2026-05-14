@@ -316,10 +316,22 @@ export async function prepareApproveRelayerTransaction(
     tx.setGasBudget(50_000_000n);
   }
 
+  const prepaidFeeMist = config.MINT_FEE_MIST * BigInt(maxMints);
+  const paymentCoins = await findSuiCoinsForAmount(client, owner, prepaidFeeMist);
+  const primaryPaymentCoin = tx.object(paymentCoins[0]);
+  if (paymentCoins.length > 1) {
+    tx.mergeCoins(
+      primaryPaymentCoin,
+      paymentCoins.slice(1).map((coinId) => tx.object(coinId))
+    );
+  }
+  const [paymentCoin] = tx.splitCoins(primaryPaymentCoin, [tx.pure.u64(prepaidFeeMist)]);
+
   tx.moveCall({
-    target: `${getRuntimePackageId(config)}::shit_coin::approve_relayer`,
+    target: `${getRuntimePackageId(config)}::shit_coin::approve_relayer_prepaid`,
     arguments: [
       tx.object(requireMintConfigId(config)),
+      paymentCoin,
       tx.pure.address(relayer),
       tx.pure.u64(BigInt(maxMints))
     ]
@@ -359,12 +371,10 @@ export async function executeDelegatedMintTransaction(
   tx.setSender(relayerKeypair.toSuiAddress());
   tx.setGasBudget(50_000_000n);
 
-  const [feeCoin] = tx.splitCoins(tx.gas, [tx.pure.u64(config.MINT_FEE_MIST)]);
   tx.moveCall({
-    target: `${getRuntimePackageId(config)}::shit_coin::delegated_mint`,
+    target: `${getRuntimePackageId(config)}::shit_coin::delegated_mint_prepaid`,
     arguments: [
       tx.object(requireMintConfigId(config)),
-      feeCoin,
       tx.pure.address(recipient),
       tx.pure.u64(SHIT_MINT_AMOUNT)
     ]
@@ -380,6 +390,32 @@ export async function executeDelegatedMintTransaction(
       showObjectChanges: true
     }
   });
+}
+
+async function findSuiCoinsForAmount(client: SuiClient, owner: string, amount: bigint): Promise<string[]> {
+  let cursor: string | null | undefined;
+  let total = 0n;
+  const coinIds: string[] = [];
+
+  do {
+    const page = await client.getCoins({
+      owner,
+      coinType: "0x2::sui::SUI",
+      cursor
+    });
+
+    for (const coin of page.data) {
+      coinIds.push(coin.coinObjectId);
+      total += BigInt(coin.balance);
+      if (total >= amount) {
+        return coinIds;
+      }
+    }
+
+    cursor = page.nextCursor;
+  } while (cursor);
+
+  throw new Error(`Not enough SUI for the prepaid mint deposit. Need ${amount.toString()} MIST.`);
 }
 
 function buildMintTransaction(config: AppConfig, recipient: string): Transaction {

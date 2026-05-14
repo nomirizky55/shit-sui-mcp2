@@ -314,12 +314,12 @@
         <section class="hero">
           <div>
             <h2>Mint SHIT through Claude</h2>
-            <p class="muted">Claude can use the MCP server to prepare mint requests. This page connects your Sui wallet and handles the required wallet approval.</p>
+            <p class="muted">Claude can mint later through the MCP server after you approve a prepaid allowance from your Sui wallet.</p>
           </div>
           <div class="hero-actions">
             <button id="copyMcpButton" class="secondary">Copy MCP URL</button>
             <button id="copyPromptButton" class="secondary">Copy Claude Prompt</button>
-            <button id="approveRelayerButton" disabled>Approve Claude Once</button>
+            <button id="approveRelayerButton" disabled>Approve + Pay Deposit</button>
           </div>
         </section>
 
@@ -336,9 +336,9 @@
 
         <section class="claude-panel">
           <strong>Claude Setup</strong>
-          <p class="muted">Add this MCP URL in Claude/Codex, then use the prompt below. If Claude returns a transaction block, use this page to connect wallet and approve the mint.</p>
+          <p class="muted">Add this MCP URL in Claude/Codex, approve a prepaid allowance here, then Claude can mint from chat without another wallet popup.</p>
           <label>
-            Claude allowance
+            Prepaid Claude allowance
             <select id="mintCount">
               <option value="1">1 mint</option>
               <option value="2">2 mints</option>
@@ -365,7 +365,7 @@
             <div class="stat"><span>Used</span><strong id="used">-</strong></div>
             <div class="stat"><span>Remaining</span><strong id="remaining">-</strong></div>
             <div class="stat"><span>Eligible</span><strong id="eligible">-</strong></div>
-            <div class="stat"><span>Claude Allowance</span><strong id="delegated">-</strong></div>
+            <div class="stat"><span>Prepaid Allowance</span><strong id="delegated">-</strong></div>
           </div>
           <div id="notice" class="pill">Waiting for wallet</div>
         </section>
@@ -494,16 +494,16 @@
         approveRelayerButton.disabled = true;
         try {
           const maxMints = Number(mintCount.value);
-          setNotice("Preparing one-time Claude approval");
+          setNotice("Preparing prepaid Claude approval");
           const prepared = await requestJson("/api/prepare-relayer-approval", {
             method: "POST",
             body: JSON.stringify({ userAddress: account.address, maxMints })
           });
 
-          setNotice("Sign one-time Claude approval in your wallet");
+          setNotice("Sign approval and prepaid mint deposit in your wallet");
           const userSignature = await signTransaction(prepared.transactionBlock);
 
-          setNotice("Submitting Claude approval");
+          setNotice("Submitting prepaid Claude approval");
           const submitted = await requestJson("/api/submit-relayer-approval", {
             method: "POST",
             body: JSON.stringify({
@@ -516,7 +516,7 @@
 
           appendDigest(submitted.digest);
           await refreshStatus();
-          setNotice("Claude approval active");
+          setNotice("Prepaid Claude approval active");
         } catch (error) {
           showError(error);
         } finally {

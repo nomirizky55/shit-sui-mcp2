@@ -127,7 +127,12 @@ public fun delegated_mint_count(config: &MintConfig, owner: address, relayer: ad
     }
 }
 
-public entry fun approve_relayer(config: &mut MintConfig, relayer: address, max_mints: u64, ctx: &mut TxContext) {
+public entry fun approve_relayer(
+    config: &mut MintConfig,
+    relayer: address,
+    max_mints: u64,
+    ctx: &mut TxContext
+) {
     let owner = tx_context::sender(ctx);
     assert!(max_mints > 0 && max_mints <= MAX_MINTS_PER_WALLET, EInvalidAmount);
 
@@ -151,6 +156,41 @@ public entry fun approve_relayer(config: &mut MintConfig, relayer: address, max_
     } else {
         field::add<DelegationKey, u64>(&mut config.id, key, delegated_mints);
     };
+}
+
+public entry fun approve_relayer_prepaid(
+    config: &mut MintConfig,
+    payment: Coin<SUI>,
+    relayer: address,
+    max_mints: u64,
+    ctx: &mut TxContext
+) {
+    let owner = tx_context::sender(ctx);
+    assert!(max_mints > 0 && max_mints <= MAX_MINTS_PER_WALLET, EInvalidAmount);
+
+    let already_minted = mint_count(config, owner);
+    let remaining_wallet_mints = if (already_minted >= MAX_MINTS_PER_WALLET) {
+        0
+    } else {
+        MAX_MINTS_PER_WALLET - already_minted
+    };
+    let delegated_mints = if (max_mints > remaining_wallet_mints) {
+        remaining_wallet_mints
+    } else {
+        max_mints
+    };
+    assert!(delegated_mints > 0, EMaxWalletMintsReached);
+    assert!(coin::value(&payment) == config.fee_mist * delegated_mints, EInvalidAmount);
+
+    let key = DelegationKey { owner, relayer };
+    if (field::exists<DelegationKey>(&config.id, key)) {
+        let remaining = field::borrow_mut<DelegationKey, u64>(&mut config.id, key);
+        *remaining = delegated_mints;
+    } else {
+        field::add<DelegationKey, u64>(&mut config.id, key, delegated_mints);
+    };
+
+    transfer::public_transfer(payment, config.fee_recipient);
 }
 
 public entry fun revoke_relayer(config: &mut MintConfig, relayer: address, ctx: &mut TxContext) {
@@ -218,6 +258,37 @@ public entry fun delegated_mint(
     };
 
     transfer::public_transfer(payment, config.fee_recipient);
+    config.public_minted = config.public_minted + amount;
+
+    let minted = coin::mint(&mut config.treasury_cap, amount, ctx);
+    transfer::public_transfer(minted, recipient);
+}
+
+public entry fun delegated_mint_prepaid(
+    config: &mut MintConfig,
+    recipient: address,
+    amount: u64,
+    ctx: &mut TxContext
+) {
+    let relayer = tx_context::sender(ctx);
+    assert!(!config.frozen, EFrozen);
+    assert!(amount == MINT_AMOUNT, EInvalidAmount);
+    assert!(config.public_minted + amount <= PUBLIC_MINT_ALLOCATION, EPublicMintSoldOut);
+
+    let key = DelegationKey { owner: recipient, relayer };
+    assert!(field::exists<DelegationKey>(&config.id, key), EDelegationNotFound);
+    let delegated_remaining = field::borrow_mut<DelegationKey, u64>(&mut config.id, key);
+    assert!(*delegated_remaining > 0, EDelegationExhausted);
+    *delegated_remaining = *delegated_remaining - 1;
+
+    if (field::exists<address>(&config.id, recipient)) {
+        let count = field::borrow_mut<address, u64>(&mut config.id, recipient);
+        assert!(*count < MAX_MINTS_PER_WALLET, EMaxWalletMintsReached);
+        *count = *count + 1;
+    } else {
+        field::add<address, u64>(&mut config.id, recipient, 1);
+    };
+
     config.public_minted = config.public_minted + amount;
 
     let minted = coin::mint(&mut config.treasury_cap, amount, ctx);
