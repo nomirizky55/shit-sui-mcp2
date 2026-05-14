@@ -119,7 +119,6 @@
       .topbar,
       .hero,
       .claude-panel,
-      .mint-panel,
       .status-panel,
       .result-panel {
         border: 1px solid var(--line);
@@ -167,12 +166,6 @@
         color: var(--muted);
         font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
         overflow-wrap: anywhere;
-      }
-
-      .mint-panel {
-        padding: 24px;
-        display: grid;
-        gap: 20px;
       }
 
       .controls {
@@ -333,36 +326,25 @@
         <section class="claude-panel">
           <strong>Claude Setup</strong>
           <p class="muted">Add this MCP URL in Claude/Codex, then use the prompt below. If Claude returns a transaction block, use this page to connect wallet and approve the mint.</p>
+          <label>
+            Claude allowance
+            <select id="mintCount">
+              <option value="1">1 mint</option>
+              <option value="2">2 mints</option>
+              <option value="3">3 mints</option>
+              <option value="4">4 mints</option>
+              <option value="5">5 mints</option>
+              <option value="6">6 mints</option>
+              <option value="7">7 mints</option>
+              <option value="8">8 mints</option>
+              <option value="9">9 mints</option>
+              <option value="10">10 mints</option>
+            </select>
+          </label>
           <div class="copy-row">
             <div class="code-box" id="mcpUrl">https://shit-sui-mcp-udhl.onrender.com/mcp</div>
           </div>
           <div class="code-box" id="claudePrompt">mint 1 SHIT untuk wallet Sui saya 0x...</div>
-        </section>
-
-        <section class="mint-panel">
-          <div>
-            <h2>Mint SHIT</h2>
-            <p class="muted">Connect a Sui wallet, sign the sponsored transaction, and receive SHIT on testnet.</p>
-          </div>
-          <div class="controls">
-            <label>
-              Mint count
-              <select id="mintCount">
-                <option value="1">1 mint</option>
-                <option value="2">2 mints</option>
-                <option value="3">3 mints</option>
-                <option value="4">4 mints</option>
-                <option value="5">5 mints</option>
-                <option value="6">6 mints</option>
-                <option value="7">7 mints</option>
-                <option value="8">8 mints</option>
-                <option value="9">9 mints</option>
-                <option value="10">10 mints</option>
-              </select>
-            </label>
-            <button id="mintButton" disabled>Mint</button>
-          </div>
-          <div id="notice" class="pill">Waiting for wallet</div>
         </section>
 
         <section class="status-panel">
@@ -374,6 +356,7 @@
             <div class="stat"><span>Eligible</span><strong id="eligible">-</strong></div>
             <div class="stat"><span>Claude Allowance</span><strong id="delegated">-</strong></div>
           </div>
+          <div id="notice" class="pill">Waiting for wallet</div>
         </section>
 
         <section class="result-panel">
@@ -396,7 +379,6 @@
       const copyPromptButton = document.querySelector("#copyPromptButton");
       const approveRelayerButton = document.querySelector("#approveRelayerButton");
       const delegatedMintButton = document.querySelector("#delegatedMintButton");
-      const mintButton = document.querySelector("#mintButton");
       const mintCount = document.querySelector("#mintCount");
       const walletAddress = document.querySelector("#walletAddress");
       const notice = document.querySelector("#notice");
@@ -423,7 +405,6 @@
       copyPromptButton.addEventListener("click", () => copyText(claudePrompt.textContent, "Claude prompt copied"));
       approveRelayerButton.addEventListener("click", approveRelayer);
       delegatedMintButton.addEventListener("click", delegatedMint);
-      mintButton.addEventListener("click", mint);
 
       function refreshWallets() {
         wallets = getWallets()
@@ -457,7 +438,6 @@
 
         walletAddress.textContent = account.address;
         claudePrompt.textContent = `mint 1 SHIT untuk wallet Sui saya ${account.address}`;
-        mintButton.disabled = false;
         approveRelayerButton.disabled = false;
         await refreshStatus();
       }
@@ -536,51 +516,6 @@
           showError(error);
         } finally {
           await refreshStatus();
-        }
-      }
-
-      async function mint() {
-        if (!account || !wallet) return;
-
-        mintButton.disabled = true;
-        results.textContent = "";
-        try {
-          await refreshStatus();
-          const requested = Number(mintCount.value);
-          const count = Math.min(requested, status.remainingMints);
-          if (count <= 0) {
-            throw new Error(status.mintBlockedReason ?? "Wallet has no remaining mints.");
-          }
-
-          for (let index = 0; index < count; index += 1) {
-            setNotice(`Preparing mint ${index + 1} of ${count}`);
-            const prepared = await requestJson("/api/prepare-sponsored-mint", {
-              method: "POST",
-              body: JSON.stringify({ userAddress: account.address })
-            });
-
-            setNotice(`Sign mint ${index + 1} in your wallet`);
-            const userSignature = await signTransaction(prepared.transactionBlock);
-
-            setNotice(`Submitting mint ${index + 1}`);
-            const submitted = await requestJson("/api/submit-sponsored-mint", {
-              method: "POST",
-              body: JSON.stringify({
-                userAddress: account.address,
-                transactionBlock: prepared.transactionBlock,
-                userSignature
-              })
-            });
-
-            appendDigest(submitted.digest);
-            await refreshStatus();
-          }
-
-          setNotice("Mint complete");
-        } catch (error) {
-          showError(error);
-        } finally {
-          mintButton.disabled = false;
         }
       }
 
