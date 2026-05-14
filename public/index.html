@@ -117,12 +117,35 @@
       }
 
       .topbar,
+      .hero,
+      .claude-panel,
       .mint-panel,
       .status-panel,
       .result-panel {
         border: 1px solid var(--line);
         background: var(--panel);
         border-radius: 8px;
+      }
+
+      .hero {
+        padding: 28px;
+        display: grid;
+        gap: 16px;
+        background:
+          linear-gradient(135deg, rgba(32, 201, 151, 0.12), transparent 42%),
+          var(--panel);
+      }
+
+      .hero h2 {
+        font-size: 38px;
+        line-height: 1;
+      }
+
+      .hero-actions,
+      .copy-row {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
       }
 
       .topbar {
@@ -198,6 +221,7 @@
       }
 
       .status-panel,
+      .claude-panel,
       .result-panel {
         padding: 18px;
         display: grid;
@@ -225,6 +249,17 @@
 
       .digest {
         font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+        overflow-wrap: anywhere;
+      }
+
+      .code-box {
+        border: 1px solid var(--line);
+        background: #101217;
+        border-radius: 6px;
+        padding: 12px;
+        color: var(--text);
+        font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+        line-height: 1.5;
         overflow-wrap: anywhere;
       }
 
@@ -272,6 +307,17 @@
       </aside>
 
       <main>
+        <section class="hero">
+          <div>
+            <h2>Mint SHIT through Claude</h2>
+            <p class="muted">Claude can use the MCP server to prepare mint requests. This page connects your Sui wallet and handles the required wallet approval.</p>
+          </div>
+          <div class="hero-actions">
+            <button id="copyMcpButton" class="secondary">Copy MCP URL</button>
+            <button id="copyPromptButton" class="secondary">Copy Claude Prompt</button>
+          </div>
+        </section>
+
         <section class="topbar">
           <div>
             <strong>Wallet</strong>
@@ -281,6 +327,15 @@
             <select id="walletSelect" aria-label="Wallet"></select>
             <button id="connectButton">Connect</button>
           </div>
+        </section>
+
+        <section class="claude-panel">
+          <strong>Claude Setup</strong>
+          <p class="muted">Add this MCP URL in Claude/Codex, then use the prompt below. If Claude returns a transaction block, use this page to connect wallet and approve the mint.</p>
+          <div class="copy-row">
+            <div class="code-box" id="mcpUrl">https://shit-sui-mcp-udhl.onrender.com/mcp</div>
+          </div>
+          <div class="code-box" id="claudePrompt">mint 1 SHIT untuk wallet Sui saya 0x...</div>
         </section>
 
         <section class="mint-panel">
@@ -331,13 +386,18 @@
       import { Transaction } from "https://esm.sh/@mysten/sui@1.21.0/transactions";
 
       const SUI_CHAIN = "sui:testnet";
+      const MCP_URL = "https://shit-sui-mcp-udhl.onrender.com/mcp";
       const walletSelect = document.querySelector("#walletSelect");
       const connectButton = document.querySelector("#connectButton");
+      const copyMcpButton = document.querySelector("#copyMcpButton");
+      const copyPromptButton = document.querySelector("#copyPromptButton");
       const mintButton = document.querySelector("#mintButton");
       const mintCount = document.querySelector("#mintCount");
       const walletAddress = document.querySelector("#walletAddress");
       const notice = document.querySelector("#notice");
       const results = document.querySelector("#results");
+      const mcpUrl = document.querySelector("#mcpUrl");
+      const claudePrompt = document.querySelector("#claudePrompt");
       const fields = {
         balance: document.querySelector("#balance"),
         used: document.querySelector("#used"),
@@ -353,6 +413,8 @@
       refreshWallets();
       getWallets().on("register", refreshWallets);
       connectButton.addEventListener("click", connectWallet);
+      copyMcpButton.addEventListener("click", () => copyText(MCP_URL, "MCP URL copied"));
+      copyPromptButton.addEventListener("click", () => copyText(claudePrompt.textContent, "Claude prompt copied"));
       mintButton.addEventListener("click", mint);
 
       function refreshWallets() {
@@ -386,6 +448,7 @@
         }
 
         walletAddress.textContent = account.address;
+        claudePrompt.textContent = `mint 1 SHIT untuk wallet Sui saya ${account.address}`;
         mintButton.disabled = false;
         await refreshStatus();
       }
@@ -510,6 +573,11 @@
       function showError(error) {
         notice.classList.add("error");
         notice.textContent = error instanceof Error ? error.message : "Unknown error";
+      }
+
+      async function copyText(value, message) {
+        await navigator.clipboard.writeText(value);
+        setNotice(message);
       }
     </script>
   </body>
