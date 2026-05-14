@@ -328,6 +328,7 @@
 
     <script type="module">
       import { getWallets } from "https://esm.sh/@wallet-standard/core@1.1.0";
+      import { Transaction } from "https://esm.sh/@mysten/sui@1.21.0/transactions";
 
       const SUI_CHAIN = "sui:testnet";
       const walletSelect = document.querySelector("#walletSelect");
@@ -445,10 +446,11 @@
 
       async function signTransaction(transactionBlock) {
         const bytes = fromBase64(transactionBlock);
+        const transaction = Transaction.from(bytes);
         const signTransaction = wallet.features["sui:signTransaction"];
         if (signTransaction) {
           const result = await signTransaction.signTransaction({
-            transaction: bytes,
+            transaction,
             account,
             chain: SUI_CHAIN
           });
@@ -458,7 +460,7 @@
         const signTransactionBlock = wallet.features["sui:signTransactionBlock"];
         if (signTransactionBlock) {
           const result = await signTransactionBlock.signTransactionBlock({
-            transactionBlock: bytes,
+            transactionBlock: transaction,
             account,
             chain: SUI_CHAIN
           });
