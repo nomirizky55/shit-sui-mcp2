@@ -415,6 +415,7 @@
       copyPromptButton.addEventListener("click", () => copyText(claudePrompt.textContent, "Claude prompt copied"));
       approveRelayerButton.addEventListener("click", approveRelayer);
       delegatedMintButton.addEventListener("click", delegatedMint);
+      mintCount.addEventListener("change", updateClaudePrompt);
 
       function refreshWallets() {
         wallets = getWallets()
@@ -450,7 +451,7 @@
         }
 
         walletAddress.textContent = account.address;
-        claudePrompt.textContent = `Gunakan tool delegated_mint 1 kali untuk wallet Sui saya ${account.address}`;
+        updateClaudePrompt();
         approveRelayerButton.disabled = false;
         connectButton.textContent = "Disconnect";
         await refreshStatus();
@@ -465,7 +466,7 @@
         account = null;
         status = null;
         walletAddress.textContent = "Not connected";
-        claudePrompt.textContent = "Gunakan tool delegated_mint 1 kali untuk wallet Sui saya 0xwallet yang terhubung";
+        updateClaudePrompt();
         approveRelayerButton.disabled = true;
         delegatedMintButton.disabled = true;
         connectButton.textContent = "Connect";
@@ -475,6 +476,12 @@
         fields.eligible.textContent = "-";
         fields.delegated.textContent = "-";
         setNotice("Wallet disconnected");
+      }
+
+      function updateClaudePrompt() {
+        const count = Number(mintCount.value || 1);
+        const address = account?.address ?? "0xwallet yang terhubung";
+        claudePrompt.textContent = `Gunakan tool delegated_mint ${count} kali untuk wallet Sui saya ${address}`;
       }
 
       async function refreshStatus() {
