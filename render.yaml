@@ -1,0 +1,32 @@
+services:
+  - type: web
+    name: shit-sui-mcp
+    runtime: node
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm run start:http
+    autoDeploy: true
+    healthCheckPath: /healthz
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: SUI_NETWORK
+        value: testnet
+      - key: SUI_FULLNODE_URL
+        value: https://fullnode.testnet.sui.io:443
+      - key: MCP_HTTP_HOST
+        value: 0.0.0.0
+      - key: MCP_OAUTH_BEARER_TOKEN
+        sync: false
+      - key: SUI_PACKAGE_ID
+        value: 0x8e8d346494e270479b183ae7c6f0f8fa8334dd0b3e6d4622af7b33d1c869b1ed
+      - key: SHIT_MINT_CONFIG_ID
+        value: 0x1167d03e5d967b8ca8c561e18021434b5acc6a7dc559609b83ca2459ed5a9836
+      - key: MINT_FEE_MIST
+        value: "1000000000"
+      - key: FEE_RECIPIENT
+        value: 0xb2a1a32b7a16f4a4f788e4901276a88f7b370130f6f77ebe3cc94734dc2e8e99
+      - key: LP_RECIPIENT
+        value: 0xb2a1a32b7a16f4a4f788e4901276a88f7b370130f6f77ebe3cc94734dc2e8e99
+      - key: SPONSOR_PRIVATE_KEY
+        sync: false

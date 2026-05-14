@@ -1,0 +1,10 @@
+node_modules
+dist
+.env
+.env.production
+move/build
+*.exe
+localtunnel.*.log
+.git
+plugins
+.agents
