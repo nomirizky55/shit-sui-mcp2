@@ -175,7 +175,7 @@ async function getDelegatedMintCount(
   const dynamicField = await client.getDynamicFieldObject({
     parentId: mintConfigId,
     name: {
-      type: `${getRuntimePackageId(config)}::shit_coin::DelegationKey`,
+      type: `${getDelegationKeyPackageId(config)}::shit_coin::DelegationKey`,
       value: {
         owner,
         relayer
@@ -468,4 +468,8 @@ export async function prepareConfigTransaction(
 
 function getRuntimePackageId(config: AppConfig): string {
   return config.SUI_RUNTIME_PACKAGE_ID ?? config.SUI_PACKAGE_ID;
+}
+
+function getDelegationKeyPackageId(config: AppConfig): string {
+  return config.SUI_DELEGATION_KEY_PACKAGE_ID ?? getRuntimePackageId(config);
 }

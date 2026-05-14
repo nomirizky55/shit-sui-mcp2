@@ -7,6 +7,7 @@ const envSchema = z.object({
   MCP_OAUTH_BEARER_TOKEN: z.string().min(16).optional(),
   SUI_PACKAGE_ID: z.string().regex(/^0x[a-fA-F0-9]+$/),
   SUI_RUNTIME_PACKAGE_ID: z.string().regex(/^0x[a-fA-F0-9]+$/).optional(),
+  SUI_DELEGATION_KEY_PACKAGE_ID: z.string().regex(/^0x[a-fA-F0-9]+$/).optional(),
   SHIT_MINT_CONFIG_ID: z.string().regex(/^0x[a-fA-F0-9]+$/).optional(),
   MINT_FEE_MIST: z.coerce.bigint().default(1_000_000_000n),
   FEE_RECIPIENT: z.string().regex(/^0x[a-fA-F0-9]+$/),
