@@ -162,6 +162,17 @@
         flex-wrap: wrap;
       }
 
+      .wallet-name {
+        min-height: 44px;
+        display: inline-flex;
+        align-items: center;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        background: var(--panel-2);
+        padding: 0 14px;
+        font-weight: 800;
+      }
+
       .address {
         color: var(--muted);
         font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
@@ -318,7 +329,7 @@
             <div id="walletAddress" class="address">Not connected</div>
           </div>
           <div class="wallet-row">
-            <select id="walletSelect" aria-label="Wallet"></select>
+            <div class="wallet-name">Slush</div>
             <button id="connectButton">Connect</button>
           </div>
         </section>
@@ -373,7 +384,6 @@
 
       const SUI_CHAIN = "sui:testnet";
       const MCP_URL = "https://shit-sui-mcp-udhl.onrender.com/mcp";
-      const walletSelect = document.querySelector("#walletSelect");
       const connectButton = document.querySelector("#connectButton");
       const copyMcpButton = document.querySelector("#copyMcpButton");
       const copyPromptButton = document.querySelector("#copyPromptButton");
@@ -400,7 +410,7 @@
 
       refreshWallets();
       getWallets().on("register", refreshWallets);
-      connectButton.addEventListener("click", connectWallet);
+      connectButton.addEventListener("click", toggleWalletConnection);
       copyMcpButton.addEventListener("click", () => copyText(MCP_URL, "MCP URL copied"));
       copyPromptButton.addEventListener("click", () => copyText(claudePrompt.textContent, "Claude prompt copied"));
       approveRelayerButton.addEventListener("click", approveRelayer);
@@ -409,27 +419,30 @@
       function refreshWallets() {
         wallets = getWallets()
           .get()
-          .filter((candidate) => candidate.features["standard:connect"]);
-        walletSelect.innerHTML = "";
+          .filter((candidate) => candidate.name.toLowerCase() === "slush" && candidate.features["standard:connect"]);
 
-        for (const candidate of wallets) {
-          const option = document.createElement("option");
-          option.value = candidate.name;
-          option.textContent = candidate.name;
-          walletSelect.append(option);
-        }
-
+        connectButton.disabled = wallets.length === 0;
         if (wallets.length === 0) {
-          const option = document.createElement("option");
-          option.textContent = "No Sui wallet found";
-          walletSelect.append(option);
-          connectButton.disabled = true;
+          setNotice("Slush wallet not found");
         }
+      }
+
+      async function toggleWalletConnection() {
+        if (account) {
+          await disconnectWallet();
+          return;
+        }
+
+        await connectWallet();
       }
 
       async function connectWallet() {
         setNotice("Connecting wallet");
-        wallet = wallets.find((candidate) => candidate.name === walletSelect.value) ?? wallets[0];
+        wallet = wallets[0];
+        if (!wallet) {
+          throw new Error("Slush wallet not found.");
+        }
+
         const result = await wallet.features["standard:connect"].connect();
         account = result.accounts.find((item) => item.chains.includes(SUI_CHAIN)) ?? result.accounts[0];
         if (!account) {
@@ -439,7 +452,29 @@
         walletAddress.textContent = account.address;
         claudePrompt.textContent = `mint 1 SHIT untuk wallet Sui saya ${account.address}`;
         approveRelayerButton.disabled = false;
+        connectButton.textContent = "Disconnect";
         await refreshStatus();
+      }
+
+      async function disconnectWallet() {
+        if (wallet?.features["standard:disconnect"]) {
+          await wallet.features["standard:disconnect"].disconnect();
+        }
+
+        wallet = null;
+        account = null;
+        status = null;
+        walletAddress.textContent = "Not connected";
+        claudePrompt.textContent = "mint 1 SHIT untuk wallet Sui saya 0x...";
+        approveRelayerButton.disabled = true;
+        delegatedMintButton.disabled = true;
+        connectButton.textContent = "Connect";
+        fields.balance.textContent = "-";
+        fields.used.textContent = "-";
+        fields.remaining.textContent = "-";
+        fields.eligible.textContent = "-";
+        fields.delegated.textContent = "-";
+        setNotice("Wallet disconnected");
       }
 
       async function refreshStatus() {
