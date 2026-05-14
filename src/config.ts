@@ -3,7 +3,8 @@ import { z } from "zod";
 const envSchema = z.object({
   SUI_NETWORK: z.enum(["mainnet", "testnet", "devnet", "localnet"]).default("testnet"),
   SUI_FULLNODE_URL: z.string().url().optional(),
-  MCP_OAUTH_BEARER_TOKEN: z.string().min(16),
+  PUBLIC_MCP: z.coerce.boolean().default(false),
+  MCP_OAUTH_BEARER_TOKEN: z.string().min(16).optional(),
   SUI_PACKAGE_ID: z.string().regex(/^0x[a-fA-F0-9]+$/),
   SHIT_MINT_CONFIG_ID: z.string().regex(/^0x[a-fA-F0-9]+$/).optional(),
   MINT_FEE_MIST: z.coerce.bigint().default(1_000_000_000n),

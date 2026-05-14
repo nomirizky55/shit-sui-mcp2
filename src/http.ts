@@ -35,7 +35,7 @@ app.get("/healthz", (_req: HttpRequest, res: HttpResponse) => {
 });
 
 app.post("/mcp", async (req: HttpRequest, res: HttpResponse) => {
-  if (!isAuthorizedHttpRequest(req)) {
+  if (!config.PUBLIC_MCP && !isAuthorizedHttpRequest(req)) {
     res.status(401).json({ error: "Unauthorized" });
     return;
   }
@@ -98,6 +98,10 @@ app.listen(port, host, (error?: Error) => {
 });
 
 function isAuthorizedHttpRequest(req: HttpRequest): boolean {
+  if (!config.MCP_OAUTH_BEARER_TOKEN) {
+    return true;
+  }
+
   const authorization = req.header("authorization");
   return authorization === `Bearer ${config.MCP_OAUTH_BEARER_TOKEN}`;
 }

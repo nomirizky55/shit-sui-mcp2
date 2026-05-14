@@ -16,6 +16,8 @@ services:
         value: https://fullnode.testnet.sui.io:443
       - key: MCP_HTTP_HOST
         value: 0.0.0.0
+      - key: PUBLIC_MCP
+        value: "true"
       - key: MCP_OAUTH_BEARER_TOKEN
         sync: false
       - key: SUI_PACKAGE_ID

@@ -15,7 +15,7 @@ import {
 } from "./sui.js";
 
 const authShape = {
-  accessToken: z.string().describe("OAuth bearer token issued to the MCP client.")
+  accessToken: z.string().optional().describe("Optional OAuth bearer token for private MCP deployments.")
 };
 
 function textJson(value: unknown) {

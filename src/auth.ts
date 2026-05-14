@@ -1,6 +1,10 @@
 import type { AppConfig } from "./config.js";
 
-export function assertAuthorized(config: AppConfig, accessToken: string): void {
+export function assertAuthorized(config: AppConfig, accessToken?: string): void {
+  if (config.PUBLIC_MCP || !config.MCP_OAUTH_BEARER_TOKEN) {
+    return;
+  }
+
   if (accessToken !== config.MCP_OAUTH_BEARER_TOKEN) {
     throw new Error("Unauthorized: invalid OAuth bearer token");
   }
